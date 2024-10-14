@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Реалистичная Змейка</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #2c3e50;
+            color: #ecf0f1;
+        }
+        .game-container {
+            text-align: center;
+        }
+        #gameCanvas {
+            border: 4px solid #34495e;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        #score {
+            font-size: 24px;
+            margin-top: 20px;
+            color: #ecf0f1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #startButton {
+            font-size: 18px;
+            padding: 12px 24px;
+            margin-top: 20px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #startButton:hover {
+            background: #2ecc71;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div id="score">Счет: 0</div>
+        <button id="startButton">Начать игру</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const startButton = document.getElementById('startButton');
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+        let snake = [{ x: 10, y: 10 }];
+        let food = { x: 15, y: 15 };
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let gameLoop;
+
+        function drawGame() {
+            clearCanvas();
+            moveSnake();
+            drawSnake();
+            drawFood();
+            checkCollision();
+            updateScore();
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = '#8B4513'; // Цвет земли
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawSnake() {
+            snake.forEach((segment, index) => {
+                if (index === 0) {
+                    drawSnakeHead(segment);
+                } else {
+                    drawSnakeBody(segment, index);
+                }
+            });
+        }
+
+        function drawSnakeHead(segment) {
+            ctx.fillStyle = '#006400'; // Темно-зеленый цвет для головы
+            ctx.beginPath();
+            ctx.ellipse(segment.x * gridSize + gridSize / 2, segment.y * gridSize + gridSize / 2, 
+                        gridSize / 2, gridSize / 3, 0, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Глаза
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(segment.x * gridSize + gridSize * 0.7, segment.y * gridSize + gridSize * 0.3, 
+                    gridSize * 0.15, 0, 2 * Math.PI);
+            ctx.arc(segment.x * gridSize + gridSize * 0.7, segment.y * gridSize + gridSize * 0.7, 
+                    gridSize * 0.15, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Зрачки
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(segment.x * gridSize + gridSize * 0.75, segment.y * gridSize + gridSize * 0.3, 
+                    gridSize * 0.07, 0, 2 * Math.PI);
+            ctx.arc(segment.x * gridSize + gridSize * 0.75, segment.y * gridSize + gridSize * 0.7, 
+                    gridSize * 0.07, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function drawSnakeBody(segment, index) {
+            ctx.fillStyle = index % 2 === 0 ? '#228B22' : '#32CD32'; // Чередование оттенков зеленого
+            ctx.beginPath();
+            ctx.ellipse(segment.x * gridSize + gridSize / 2, segment.y * gridSize + gridSize / 2, 
+                        gridSize / 2.2, gridSize / 3.2, 0, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Узор на теле змеи
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.beginPath();
+            ctx.arc(segment.x * gridSize + gridSize * 0.3, segment.y * gridSize + gridSize * 0.5, 
+                    gridSize * 0.1, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function drawFood() {
+            // Основа яблока
+            ctx.fillStyle = '#FF0000'; // Красный цвет для яблока
+            ctx.beginPath();
+            ctx.arc(food.x * gridSize + gridSize / 2, food.y * gridSize + gridSize / 2, 
+                    gridSize / 2.2, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Блик на яблоке
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.ellipse(food.x * gridSize + gridSize * 0.35, food.y * gridSize + gridSize * 0.35, 
+                        gridSize * 0.15, gridSize * 0.1, Math.PI / 4, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Черенок
+            ctx.fillStyle = '#4A0E0E';
+            ctx.fillRect(food.x * gridSize + gridSize * 0.45, food.y * gridSize, gridSize * 0.1, gridSize * 0.3);
+
+            // Листик
+            ctx.fillStyle = '#228B22';
+            ctx.beginPath();
+            ctx.ellipse(food.x * gridSize + gridSize * 0.55, food.y * gridSize + gridSize * 0.2, 
+                        gridSize * 0.2, gridSize * 0.1, Math.PI / 4, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function moveSnake() {
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+            snake.unshift(head);
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                generateFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function generateFood() {
+            food.x = Math.floor(Math.random() * tileCount);
+            food.y = Math.floor(Math.random() * tileCount);
+        }
+
+        function checkCollision() {
+            const head = snake[0];
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                gameOver();
+            }
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    gameOver();
+                }
+            }
+        }
+
+        function gameOver() {
+            clearInterval(gameLoop);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#e74c3c';
+            ctx.font = 'bold 30px Arial';
+            ctx.fillText('Игра окончена!', canvas.width / 2 - 100, canvas.height / 2 - 15);
+            ctx.fillStyle = '#ecf0f1';
+            ctx.fillText(`Счет: ${score}`, canvas.width / 2 - 50, canvas.height / 2 + 25);
+            startButton.style.display = 'block';
+        }
+
+        function updateScore() {
+            scoreElement.textContent = `Счет: ${score}`;
+        }
+
+        function startGame() {
+            snake = [{ x: 10, y: 10 }];
+            food = { x: 15, y: 15 };
+            dx = 1;
+            dy = 0;
+            score = 0;
+            startButton.style.display = 'none';
+            gameLoop = setInterval(drawGame, 100);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp': if (dy === 0) { dx = 0; dy = -1; } break;
+                case 'ArrowDown': if (dy === 0) { dx = 0; dy = 1; } break;
+                case 'ArrowLeft': if (dx === 0) { dx = -1; dy = 0; } break;
+                case 'ArrowRight': if (dx === 0) { dx = 1; dy = 0; } break;
+            }
+        });
+
+        startButton.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
